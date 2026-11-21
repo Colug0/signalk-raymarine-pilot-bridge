@@ -111,8 +111,29 @@ const PILOT_CONFIGURATION: Record<number, number[]> = {
   0x23: [0x23, 0x50, 0x64, 0x64, 0x64, 0x00]
 }
 
-export function pilotConfigurationReply(command: number, dst: number): OutMessage | undefined {
-  const body = PILOT_CONFIGURATION[command]
+// SEATALK_PILOT_HULL_TYPE
+export const HullType = {
+  sail: 0,
+  sailSlowTurn: 1,
+  sailCatamaran: 2,
+  powerSlowTurn: 3,
+  powerFastTurn: 4,
+  power: 8
+} as const
+
+export const HULL_TYPE_COMMAND = 0x16
+
+// Hull type (canboat seatalk1PilotHullType): command, an unknown byte that is
+// 0x50 in every Pilot Configuration message, the hull type, and 8 unknown
+// bytes. The p70s asks for it when it builds its mode menu; only a sailing
+// hull gets Wind. The trailing bytes follow the set command the Axiom sends
+// (…16 50 <type> 52 ff), the rest is not available.
+function hullTypeBody(hullType: number): number[] {
+  return [HULL_TYPE_COMMAND, 0x50, hullType & 0xff, 0x52, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff]
+}
+
+export function pilotConfigurationReply(command: number, dst: number, hullType: number = HullType.sail): OutMessage | undefined {
+  const body = command === HULL_TYPE_COMMAND ? hullTypeBody(hullType) : PILOT_CONFIGURATION[command]
   if (!body) return undefined
   return { pgn: PGN.seatalk, dst, prio: 7, data: [...RAYMARINE, 0x6c, ...body] }
 }

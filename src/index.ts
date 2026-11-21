@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { Type, type Static } from 'typebox'
 import { Bridge, type Navigation } from './bridge.js'
 import { CanBus } from './canbus.js'
+import { HullType } from './raymarine.js'
 import { AccessRequest, V2Pilot, type TokenStore } from './v2.js'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -38,6 +39,21 @@ export const ConfigSchema = Type.Object({
     description: 'As a real EV-1 does next to the pilot mode.',
     default: true
   }),
+  hullType: Type.Union(
+    [
+      Type.Literal('sail'),
+      Type.Literal('sailSlowTurn'),
+      Type.Literal('sailCatamaran'),
+      Type.Literal('power'),
+      Type.Literal('powerSlowTurn'),
+      Type.Literal('powerFastTurn')
+    ],
+    {
+      title: 'Hull type reported to the control head',
+      description: 'The head offers Wind mode only for a sailing hull.',
+      default: 'sail'
+    }
+  ),
   serverUrl: Type.String({
     title: 'Signal K server URL for the V2 API',
     description: 'Empty: this server on localhost.',
@@ -107,6 +123,7 @@ export default function plugin(app: any) {
         uniqueNumber: 1851204,
         targetReference: 'true',
         sendSeatalkModeDatagram: true,
+        hullType: 'sail',
         serverUrl: '',
         ...config
       }
@@ -139,6 +156,7 @@ export default function plugin(app: any) {
       bridge = new Bridge(bus, pilot, navigation(app), {
         targetReference: c.targetReference,
         sendSeatalkModeDatagram: c.sendSeatalkModeDatagram,
+        hullType: HullType[c.hullType],
         listenOnly: c.listenOnly,
         log,
         error

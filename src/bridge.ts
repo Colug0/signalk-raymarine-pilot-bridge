@@ -60,6 +60,8 @@ export interface BridgeOptions {
   // how the V2 provider reports a heading target
   targetReference: 'true' | 'magnetic'
   sendSeatalkModeDatagram: boolean
+  // SEATALK_PILOT_HULL_TYPE reported to the head; a sailing hull gets Wind
+  hullType?: number
   // receive and log only, send nothing but the address claim
   listenOnly: boolean
   log: (msg: string) => void
@@ -231,7 +233,7 @@ export class Bridge {
       const prop = gf.params.get(4)?.[0]
       const command = gf.params.get(5)?.[0]
       if (prop === 0x6c && command !== undefined) {
-        const reply = pilotConfigurationReply(command, src)
+        const reply = pilotConfigurationReply(command, src, this.opts.hullType)
         if (reply) {
           this.send(reply)
           return

@@ -212,6 +212,24 @@ describe('wind mode', () => {
   })
 })
 
+describe('hull type', () => {
+  it('answers the head\'s hull type request with a sailing hull', () => {
+    const { bridge, sent } = setup({ state: 'standby', engaged: false, target: null })
+    // request 126720, Raymarine, Pilot Configuration 0x6c, Hull Type 0x16
+    bridge.handle({
+      pgn: PGN.groupFunction,
+      src: 4,
+      dst: 204,
+      prio: 3,
+      data: Uint8Array.from([0x00, 0x00, 0xef, 0x01, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x04, 0x01, 0x3b, 0x07, 0x03, 0x04, 0x04, 0x6c, 0x05, 0x16, 0x50])
+    })
+    expect(sent).toHaveLength(1)
+    expect(sent[0]).toMatchObject({ pgn: 126720, dst: 4 })
+    expect(sent[0].data.slice(0, 6)).toEqual([0x3b, 0x9f, 0x6c, 0x16, 0x50, 0x00])
+    expect(sent[0].data).toHaveLength(14)
+  })
+})
+
 describe('status to the head', () => {
   it('sends mode and mode datagram', async () => {
     const { bridge, sent } = setup({ state: 'auto', engaged: true, target: 1 })
