@@ -180,9 +180,12 @@ export class AccessRequest {
         state?: string
         accessRequest?: { permission?: string; token?: string }
       }
-      if (res.status === 404) {
+      if (res.status >= 400) {
+        // The server keeps pending requests in memory: after a restart the
+        // href answers 404 or 500. Ask again on the next step.
         this.state = { clientId: this.state.clientId }
         this.store.save(this.state)
+        this.status('access request lost (server restarted?), asking again')
         return
       }
       if (b?.state === 'COMPLETED') {

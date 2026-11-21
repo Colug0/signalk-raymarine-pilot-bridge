@@ -77,6 +77,23 @@ describe('access request', () => {
   })
 })
 
+describe('access request after a server restart', () => {
+  it('asks again when the stored request is gone', async () => {
+    let saved: Record<string, unknown> = {}
+    const store = { load: () => ({ clientId: 'c1', href: '/signalk/v1/requests/old' }), save: (v: Record<string, unknown>) => (saved = v) }
+    const { request, calls } = fake({
+      'GET /signalk/v1/requests/old': { status: 500, body: 'Internal Server Error' },
+      'POST /signalk/v1/access/requests': { status: 202, body: { state: 'PENDING', href: '/signalk/v1/requests/new' } }
+    })
+    const a = new AccessRequest(BASE, store, () => {}, request)
+    await a.step()
+    expect(saved).toEqual({ clientId: 'c1' })
+    await a.step()
+    expect(saved).toEqual({ clientId: 'c1', href: '/signalk/v1/requests/new' })
+    expect(calls.map((c) => c.method)).toEqual(['GET', 'POST'])
+  })
+})
+
 describe('access request on an open server', () => {
   it('stops asking when security is off', async () => {
     const status: string[] = []
