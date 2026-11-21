@@ -69,6 +69,22 @@ export function lockedHeadingMessage(magnetic: number | undefined, trueHeading?:
   return { pgn: PGN.lockedHeading, dst: 255, prio: 7, data: [...RAYMARINE, 0xff, lo(t), hi(t), lo(m), hi(m), 0xff] }
 }
 
+// Locked wind angle and its rolling average, unsigned: a port angle goes out
+// as its starboard equivalent, −30° as 330°.
+export function windDatumMessage(datum: number | undefined, rollingAverage: number | undefined): OutMessage {
+  const d = encodeAngle(datum)
+  const r = encodeAngle(rollingAverage)
+  return { pgn: PGN.windDatum, dst: 255, prio: 7, data: [...RAYMARINE, lo(d), hi(d), lo(r), hi(r), 0xff, 0xff] }
+}
+
+// SeaTalk1 keystroke (126720 f0 81 86): key code and its inverse.
+export function decodeKeystroke(data: Uint8Array): number | undefined {
+  if (data.length < 8) return undefined
+  if (data[0] !== RAYMARINE[0] || data[2] !== 0xf0 || data[3] !== 0x81 || data[4] !== 0x86) return undefined
+  const key = data[6]
+  return (key ^ data[7]) === 0xff ? key : undefined
+}
+
 // SeaTalk1 "device identification", device 5 = course computer.
 export function deviceIdentificationMessage(): OutMessage {
   return { pgn: PGN.seatalk, dst: 255, prio: 7, data: [...RAYMARINE, 0xf0, 0x81, 0x90, 0x10, 0x05] }

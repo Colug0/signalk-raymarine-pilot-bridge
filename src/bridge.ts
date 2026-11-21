@@ -13,7 +13,9 @@ import {
   acknowledgeMessage,
   decodeAngle,
   decodeGroupFunction,
+  decodeKeystroke,
   deviceIdentificationMessage,
+  windDatumMessage,
   isRaymarine,
   lockedHeadingMessage,
   pilotConfigurationReply,
@@ -100,7 +102,8 @@ export function adjustRadians(wholeDegrees: number): number {
 export class Bridge {
   private status: PilotStatus | undefined
   private reportedTargetMagnetic: number | undefined
-  private commanded: { value: number; until: number } | undefined
+  private reportedTargetWind: number | undefined
+  private commanded: { kind: 'heading' | 'wind'; value: number; until: number } | undefined
   private timers: NodeJS.Timeout[] = []
   private polling = false
 
@@ -170,20 +173,43 @@ export class Bridge {
     return t === undefined ? undefined : t - (this.nav.variation() ?? 0)
   }
 
+  // Signed apparent wind angle the pilot holds, as the V2 API reports it.
+  targetWind(): number | undefined {
+    const s = this.status
+    if (!s || !s.engaged || s.state !== 'wind' || s.target === null) return undefined
+    return s.target
+  }
+
+  // Until the pilot reports the new target (V2 polls once a second, the
+  // pilot takes a moment too), keep showing what the head asked for.
+  private held(kind: 'heading' | 'wind', now: number): number | undefined {
+    const c = this.commanded
+    return c && c.kind === kind && now < c.until ? c.value : undefined
+  }
+
   sendHeading(now = Date.now()): void {
     this.send(pilotHeadingMessage(this.headingMagnetic()))
-    // Until the pilot reports the new target (V2 polls once a second, the
-    // pilot takes a moment too), keep showing what the head asked for.
-    const held = this.commanded && now < this.commanded.until ? this.commanded.value : undefined
-    const target = held ?? this.targetMagnetic()
+    const target = this.held('heading', now) ?? this.targetMagnetic()
     if (target !== undefined) {
       this.reportedTargetMagnetic = target
       this.send(lockedHeadingMessage(target))
+    }
+    const wind = this.held('wind', now) ?? this.targetWind()
+    if (wind !== undefined) {
+      this.reportedTargetWind = wind
+      this.send(windDatumMessage(wind, this.nav.windAngleApparent()))
     }
   }
 
   // Entry point for every reassembled message from the bus.
   handle(msg: N2kMessage): void {
+    if (msg.pgn === PGN.seatalk) {
+      // Older heads send key presses; the p70s sends group functions. Only
+      // logged until a recording shows a head that needs them.
+      const key = decodeKeystroke(msg.data)
+      if (key !== undefined) this.opts.log(`keystroke 0x${key.toString(16)} from ${msg.src} to ${msg.dst} (ignored)`)
+      return
+    }
     if (msg.pgn !== PGN.groupFunction) return
     const own = this.bus.address()
     if (own === undefined || msg.dst !== own) return
@@ -232,6 +258,8 @@ export class Bridge {
         return this.modeCommand(src, gf)
       case PGN.lockedHeading:
         return this.headingCommand(src, gf)
+      case PGN.windDatum:
+        return this.windCommand(src, gf)
       default:
         this.opts.log(`unsupported command from ${src} for ${gf.pgn}`)
         this.ack(src, gf, PgnErrorCode.pgnNotSupported)
@@ -296,8 +324,33 @@ export class Bridge {
     // Report the new target at once, so a quick second key press counts
     // from it and not from the old one.
     this.reportedTargetMagnetic = wanted
-    this.commanded = { value: wanted, until: Date.now() + 3000 }
+    this.commanded = { kind: 'heading', value: wanted, until: Date.now() + 3000 }
     this.send(lockedHeadingMessage(wanted))
     this.run(`adjust ${degrees}° (from ${src})`, () => this.pilot.adjust(adjustRadians(degrees)))
+  }
+
+  // In wind mode the head sends the new wind angle, unsigned. Its change is
+  // the change of the signed apparent wind angle. A V2 adjustment is "+ turns
+  // the boat to starboard", and turning to starboard makes the signed angle
+  // smaller (wind moves towards port), so the adjustment is the negative of
+  // the change.
+  private windCommand(src: number, gf: GroupFunction): void {
+    const raw = u16(gf.params.get(4))
+    const wanted = raw === undefined ? undefined : decodeAngle(raw)
+    const current = this.reportedTargetWind
+    if (wanted === undefined || current === undefined || this.status?.state !== 'wind') {
+      this.ack(src, gf, PgnErrorCode.pgnNotAvailable)
+      return
+    }
+    const degrees = Math.round(wrapPi(wanted - current) / DEG)
+    this.ack(src, gf)
+    if (degrees === 0) return
+    const signed = wrapPi(wanted)
+    this.reportedTargetWind = signed
+    this.commanded = { kind: 'wind', value: signed, until: Date.now() + 3000 }
+    this.send(windDatumMessage(signed, this.nav.windAngleApparent()))
+    this.run(`wind ${degrees > 0 ? '+' : ''}${degrees}° → adjust ${-degrees}° (from ${src})`, () =>
+      this.pilot.adjust(adjustRadians(-degrees))
+    )
   }
 }

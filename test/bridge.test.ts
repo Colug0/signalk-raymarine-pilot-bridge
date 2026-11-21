@@ -157,6 +157,61 @@ describe('commands from the head', () => {
   })
 })
 
+// A wind angle command as signalk-autopilot's Raymarine driver sends it.
+function windCommand(rad: number): N2kMessage {
+  const v = encodeAngle(rad)
+  return {
+    pgn: PGN.groupFunction,
+    src: 4,
+    dst: 204,
+    prio: 3,
+    data: Uint8Array.from([0x01, 0x41, 0xff, 0x00, 0xf8, 0x03, 0x01, 0x3b, 0x07, 0x03, 0x04, 0x04, v & 0xff, v >> 8])
+  }
+}
+
+describe('wind mode', () => {
+  it('reports a port wind target as its unsigned equivalent', async () => {
+    const { bridge, sent } = setup({ state: 'wind', engaged: true, target: -30 * DEG })
+    await bridge.poll()
+    bridge.sendHeading()
+    const w = sent.find((m) => m.pgn === PGN.windDatum)!
+    expect(decodeAngle(w.data[2] | (w.data[3] << 8))! / DEG).toBeCloseTo(330, 1)
+    expect(decodeAngle(w.data[4] | (w.data[5] << 8))! / DEG).toBeCloseTo(40, 1)
+    expect(sent.some((m) => m.pgn === PGN.lockedHeading)).toBe(false)
+  })
+
+  it('wind from port, angle grows (bear away): boat to starboard', async () => {
+    const { bridge, pilot } = setup({ state: 'wind', engaged: true, target: -30 * DEG })
+    await bridge.poll()
+    bridge.sendHeading()
+    bridge.handle(windCommand(-31 * DEG))
+    await flush()
+    expect(pilot.calls).toEqual(['adjust 1'])
+  })
+
+  it('wind from starboard, angle grows (bear away): boat to port, across 0/360 too', async () => {
+    const { bridge, pilot } = setup({ state: 'wind', engaged: true, target: 40 * DEG })
+    await bridge.poll()
+    bridge.sendHeading()
+    bridge.handle(windCommand(50 * DEG))
+    await flush()
+    bridge.handle(windCommand(-5 * DEG))
+    await flush()
+    expect(pilot.calls).toEqual(['adjust -10', 'adjust 55'])
+  })
+
+  it('a wind command outside wind mode is refused', async () => {
+    const { bridge, sent, pilot } = setup({ state: 'auto', engaged: true, target: 1 })
+    await bridge.poll()
+    bridge.sendHeading()
+    sent.length = 0
+    bridge.handle(windCommand(30 * DEG))
+    await flush()
+    expect(pilot.calls).toEqual([])
+    expect(sent[0].data[4]).toBe(PgnErrorCode.pgnNotAvailable)
+  })
+})
+
 describe('status to the head', () => {
   it('sends mode and mode datagram', async () => {
     const { bridge, sent } = setup({ state: 'auto', engaged: true, target: 1 })

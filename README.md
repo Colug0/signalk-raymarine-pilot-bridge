@@ -10,9 +10,9 @@ steers the boat carries them out, for example
 [signalk-autopilot](https://github.com/SignalK/signalk-autopilot) with a
 B&G NAC-3.
 
-**Status: experimental, stage 1.** Standby, Auto and ±1/±10 in Auto.
-Wind mode is reported and can be selected; wind adjustments, No Drift, Track
-and alarms are not done yet. Not yet tested with a real p70s.
+**Status: experimental.** Standby, Auto and ±1/±10 in Auto work with a p70s
+and a B&G NAC-3. Wind mode with ±1/±10 is built but not yet tried on the
+boat. No Drift, Track and alarms are not done yet.
 
 ## How it works
 
@@ -22,10 +22,11 @@ and alarms are not done yet. Not yet tested with a real p70s.
 | 126208 Command → 65379 Auto / Wind | `PUT …/state` `auto` / `wind` |
 | 126208 Command → 65379 sub-mode 4 | `POST …/tack/{port,starboard}` (side from the apparent wind) |
 | 126208 Command → 65360 new target | `PUT …/target/adjust` by the difference to the reported target |
+| 126208 Command → 65345 new wind angle | `PUT …/target/adjust`: + turns the boat to starboard, so the negative of the change of the signed wind angle |
 | 126208 Request → 126720 Pilot Configuration | fixed answers as an EV-1 gives them |
 
-It sends 65379 (pilot mode, 1 Hz), 65359 (heading) and 65360 (locked
-heading, 5 Hz), 126720 device identification, and the claim and product
+It sends 65379 (pilot mode, 1 Hz), 65359 (heading), 65360 (locked
+heading) and in wind mode 65345 (wind angle, 5 Hz), 126720 device identification, and the claim and product
 information of a Raymarine autopilot (manufacturer 1851, function 150,
 class 40, "EV-1 Course Computer").
 
