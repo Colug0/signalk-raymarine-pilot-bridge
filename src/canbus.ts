@@ -13,8 +13,11 @@ import { FastPacketAssembler, toActisense, type N2kMessage, type OutMessage, typ
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 export function resolveCanboat(): any {
-  // the plugin's own tree first, then the server's entry script
-  const candidates = [import.meta.url, process.argv[1]].filter(Boolean) as string[]
+  // The server's own copy first: that is the one whose native socketcan
+  // module is built. Another plugin may have pulled an older canboatjs into
+  // the config directory without its native part (installs skip scripts).
+  // The plugin's own tree is the fallback, for tests and development.
+  const candidates = [process.argv[1], import.meta.url].filter(Boolean) as string[]
   const errors: string[] = []
   for (const from of candidates) {
     try {
