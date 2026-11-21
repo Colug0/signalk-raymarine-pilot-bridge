@@ -63,7 +63,7 @@ export function identity(o: Pick<CanBusOptions, 'uniqueNumber' | 'modelId' | 'so
       pgn: 126996,
       dst: 255,
       fields: {
-        nmea2000Version: 2100,
+        nmea2000Version: 2.1,
         productCode: 1185,
         modelId: o.modelId,
         softwareVersionCode: o.softwareVersion,

@@ -110,5 +110,6 @@ describe('identity on the bus', () => {
     const pi = Buffer.from(toPgn(productInfo))
     const info = parser.parsePgnData({ pgn: 126996, src: 204, dst: 255, prio: 6 }, pi.length, pi, true)
     expect(info.fields.modelId).toBe('EV-1 Course Computer')
+    expect(info.fields.nmea2000Version).toBeCloseTo(2.1, 3)
   })
 })
