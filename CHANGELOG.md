@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/Colug0/signalk-raymarine-pilot-bridge/compare/v0.1.0...v0.2.0) (2026-11-22)
+
+
+### Features
+
+* add app icon ([#2](https://github.com/Colug0/signalk-raymarine-pilot-bridge/issues/2)) ([104daca](https://github.com/Colug0/signalk-raymarine-pilot-bridge/commit/104daca14984c5f7985000d7e83dcbf5c223affa))
+
 ## 0.1.0 (2026-11-22)
 
 
