@@ -64,15 +64,26 @@ function check(res: HttpResponse, what: string): void {
   throw new Error(`${what}: HTTP ${res.status}${b?.message ? ` ${b.message}` : ''}`)
 }
 
+const refused = (status: number): boolean => status === 401 || status === 403
+
 export class V2Pilot implements Pilot {
   constructor(
     private readonly baseUrl: string,
     private readonly token: () => string | undefined,
-    private readonly request: Requester = nodeRequest
+    private readonly request: Requester = nodeRequest,
+    // the server refused our token (expired, or the device was removed in
+    // the admin UI): the owner has to approve a new access request
+    private readonly onTokenRefused: () => void = () => {}
   ) {}
 
   async status(): Promise<PilotStatus | undefined> {
-    const res = await this.request('GET', this.baseUrl + PILOT, undefined, this.token())
+    const token = this.token()
+    let res = await this.request('GET', this.baseUrl + PILOT, undefined, token)
+    if (token && refused(res.status)) {
+      this.onTokenRefused()
+      // reading usually needs no token
+      res = await this.request('GET', this.baseUrl + PILOT)
+    }
     if (res.status === 404) return undefined
     check(res, 'GET autopilot')
     const b = res.body as { state?: unknown; engaged?: unknown; target?: unknown }
@@ -85,6 +96,7 @@ export class V2Pilot implements Pilot {
 
   private async write(method: string, path: string, body?: unknown): Promise<void> {
     const res = await this.request(method, this.baseUrl + PILOT + path, body, this.token())
+    if (refused(res.status)) this.onTokenRefused()
     check(res, `${method} ${path}`)
   }
 
@@ -130,9 +142,17 @@ export class AccessRequest {
   }
 
   start(): void {
-    if (this.state.token) return
+    if (this.state.token || this.timer) return
     void this.step()
     this.timer = setInterval(() => void this.step(), 10000)
+  }
+
+  // The server no longer takes our token: drop it and ask again.
+  renew(): void {
+    if (!this.state.token) return
+    this.reset()
+    this.status('token refused, asking for access again')
+    this.start()
   }
 
   stop(): void {

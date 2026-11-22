@@ -111,8 +111,9 @@ export default function plugin(app: any) {
 
   return {
     id: 'signalk-raymarine-pilot-bridge',
-    name: 'Raymarine Pilot Bridge',
-    description: 'Control the Signal K Autopilot V2 pilot from a Raymarine p70s',
+    name: 'Raymarine Pilot Bridge (experimental)',
+    description:
+      'EXPERIMENTAL: control the Signal K Autopilot V2 pilot from a Raymarine p70s. Sends on NMEA 2000 as an autopilot course computer; test at anchor first.',
     schema: () => ConfigSchema,
 
     start(config: Partial<Config>) {
@@ -132,7 +133,7 @@ export default function plugin(app: any) {
         accessStatus = m
         app.debug(m)
       })
-      const pilot = new V2Pilot(url, () => access?.token())
+      const pilot = new V2Pilot(url, () => access?.token(), undefined, () => access?.renew())
       const log = (m: string) => app.debug(m)
       const error = (m: string) => app.error(m)
       bus = new CanBus(

@@ -77,6 +77,45 @@ describe('access request', () => {
   })
 })
 
+describe('refused token', () => {
+  it('a refused write asks for a new token', async () => {
+    let renewed = 0
+    const { request } = fake({ [`PUT ${AP}/state`]: { status: 401, body: { message: 'Unauthorized' } } })
+    const p = new V2Pilot(BASE, () => 'old', request, () => renewed++)
+    await expect(p.setState('auto')).rejects.toThrow('401')
+    expect(renewed).toBe(1)
+  })
+
+  it('a refused read retries without the token', async () => {
+    let renewed = 0
+    const calls: (string | undefined)[] = []
+    const request: Requester = async (_m, _u, _b, token) => {
+      calls.push(token)
+      return token ? { status: 401, body: {} } : { status: 200, body: { state: 'standby', engaged: false, target: null } }
+    }
+    const p = new V2Pilot(BASE, () => 'old', request, () => renewed++)
+    expect(await p.status()).toEqual({ state: 'standby', engaged: false, target: null })
+    expect(calls).toEqual(['old', undefined])
+    expect(renewed).toBe(1)
+  })
+
+  it('renew drops the token and asks again', async () => {
+    let saved: Record<string, unknown> = {}
+    const store = { load: () => ({ clientId: 'c1', token: 'old' }), save: (v: Record<string, unknown>) => (saved = v) }
+    const { request, calls } = fake({
+      'POST /signalk/v1/access/requests': { status: 202, body: { state: 'PENDING', href: '/signalk/v1/requests/r2' } }
+    })
+    const a = new AccessRequest(BASE, store, () => {}, request)
+    expect(a.token()).toBe('old')
+    a.renew()
+    expect(a.token()).toBeUndefined()
+    await new Promise((r) => setTimeout(r, 0))
+    a.stop()
+    expect(calls.map((c) => c.method)).toEqual(['POST'])
+    expect(saved).toEqual({ clientId: 'c1', href: '/signalk/v1/requests/r2' })
+  })
+})
+
 describe('access request after a server restart', () => {
   it('asks again when the stored request is gone', async () => {
     let saved: Record<string, unknown> = {}
