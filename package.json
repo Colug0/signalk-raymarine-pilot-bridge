@@ -1,7 +1,7 @@
 {
   "name": "signalk-raymarine-pilot-bridge",
   "version": "0.0.0",
-  "description": "Control any Signal K Autopilot V2 pilot from a Raymarine p70s: the plugin appears on NMEA 2000 as a Raymarine course computer",
+  "description": "Experimental: control a Signal K Autopilot V2 pilot from a Raymarine p70s; the plugin appears on NMEA 2000 as a Raymarine course computer",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -44,6 +44,6 @@
     "vitest": "^4.1.12"
   },
   "signalk": {
-    "displayName": "Raymarine Pilot Bridge"
+    "displayName": "Raymarine Pilot Bridge (experimental)"
   }
 }
