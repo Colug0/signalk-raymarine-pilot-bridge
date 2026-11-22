@@ -6,7 +6,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "icon.svg"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -44,6 +45,7 @@
     "vitest": "^4.1.12"
   },
   "signalk": {
-    "displayName": "Raymarine Pilot Bridge (experimental)"
+    "displayName": "Raymarine Pilot Bridge (experimental)",
+    "appIcon": "./icon.svg"
   }
 }
